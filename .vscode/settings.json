@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "*.ini": "toml",
+        "*.yml": "yaml",
+        "vector": "cpp",
+        "system_error": "cpp",
+        "xiosbase": "cpp"
+    },
+    "markdown.validate.enabled": false
+}
