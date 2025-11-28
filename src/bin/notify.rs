@@ -1,23 +1,25 @@
-use log::info;
+use tracing::log::*;
 
 use windows::{
-    core::w, Win32::{
-        Foundation::{GetLastError, HWND, LPARAM, LRESULT, WPARAM}, Graphics::Gdi::ValidateRect, System::LibraryLoader::GetModuleHandleW, UI::{
-            Shell::{
-                Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW
-            },
-            WindowsAndMessaging::{
-                CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, LoadCursorW, LoadIconW, PostQuitMessage, RegisterClassW, TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, IDC_ARROW, IDI_APPLICATION, MSG, WINDOW_EX_STYLE, WM_CREATE, WM_DESTROY, WM_LBUTTONUP, WM_PAINT, WM_RBUTTONUP, WM_USER, WNDCLASSW, WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_OVERLAPPEDWINDOW, WS_EX_TOPMOST, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_VISIBLE
-            },
-        }
-    }
+    Win32::{
+        Foundation::{GetLastError, HWND, LPARAM, LRESULT, WPARAM},
+        Graphics::Gdi::ValidateRect,
+        System::LibraryLoader::GetModuleHandleW,
+        UI::WindowsAndMessaging::{
+            CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
+            DispatchMessageW, GetMessageW, IDC_ARROW, IDI_APPLICATION, LoadCursorW, LoadIconW, MSG,
+            PostQuitMessage, RegisterClassW, WINDOW_EX_STYLE, WM_CREATE, WM_DESTROY, WM_PAINT,
+            WM_USER, WNDCLASSW, WS_OVERLAPPEDWINDOW, WS_VISIBLE,
+        },
+    },
+    core::w,
 };
 
 const WM_NOTIFYICON: u32 = WM_USER + 1;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     let h_instance = unsafe { GetModuleHandleW(None) }?;
     let h_cursor = unsafe { LoadCursorW(None, IDC_ARROW) }?;
@@ -72,13 +74,7 @@ async fn main() -> anyhow::Result<()> {
 extern "system" fn wnproc(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     // info!("{}:{} message: 0x{message:X}", file!(), line!());
 
-    let mut result = LRESULT(0);
-
     match message {
-        WM_PAINT => {
-            println!("WM_PAINT");
-            _ = unsafe { ValidateRect(Some(window), None) };
-        }
         WM_CREATE => {
             info!("WM_CREATE");
         }
@@ -86,10 +82,8 @@ extern "system" fn wnproc(window: HWND, message: u32, wparam: WPARAM, lparam: LP
             info!("WM_DESTROY");
             unsafe { PostQuitMessage(0) };
         }
-        _ => result = unsafe { DefWindowProcW(window, message, wparam, lparam) },
+        _ => {}
     };
 
-    result
-
-    // LRESULT(0)
+    unsafe { DefWindowProcW(window, message, wparam, lparam) }
 }

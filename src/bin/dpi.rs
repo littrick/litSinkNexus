@@ -1,15 +1,21 @@
+use std::env::set_var;
+
+use tracing::log::*;
 use windows::{
-    core::*, Devices::Enumeration::DevicePicker, Foundation::Rect, Media::Audio::AudioPlaybackConnection, Win32::{
-        Foundation::*,
-        System::LibraryLoader::GetModuleHandleA,
-        UI::{Shell::IInitializeWithWindow, WindowsAndMessaging::*},
-    }
+    Win32::{
+        Foundation::*, System::LibraryLoader::GetModuleHandleA,
+        UI::{HiDpi::{DPI_AWARENESS_SYSTEM_AWARE, GetDpiForWindow, PROCESS_PER_MONITOR_DPI_AWARE, SetProcessDpiAwareness, SetThreadDpiAwarenessContext}, WindowsAndMessaging::*},
+    },
+    core::*,
 };
 
 fn main() -> Result<()> {
+    unsafe { set_var("RUST_LOG", "trace") };
+    tracing_subscriber::fmt::init();
+
     unsafe {
         let instance = GetModuleHandleA(None)?;
-        let window_class = w!("pickerwindow");
+        let window_class = w!("mywindow");
 
         let wc = WNDCLASSEXW {
             cbSize: size_of::<WNDCLASSEXW>() as u32,
@@ -26,10 +32,10 @@ fn main() -> Result<()> {
         println!("atom = {atom}");
         debug_assert!(atom != 0);
 
-        CreateWindowExW(
+        let window = CreateWindowExW(
             WINDOW_EX_STYLE::default(),
             window_class,
-            w!("Fuck window"),
+            w!("Fuck world"),
             WS_OVERLAPPEDWINDOW | WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -41,10 +47,16 @@ fn main() -> Result<()> {
             None,
         )?;
 
+        SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE).unwrap();
+
         let mut message = MSG::default();
 
         while GetMessageA(&mut message, None, 0, 0).into() {
             DispatchMessageA(&message);
+
+            // Test
+            let dpi = GetDpiForWindow(message.hwnd);
+            info!("DPI for window {:?}: {}", message.hwnd, dpi);
         }
 
         Ok(())
@@ -56,27 +68,12 @@ extern "system" fn wndproc(window: HWND, message: u32, wparam: WPARAM, lparam: L
         match message {
             WM_CREATE => {
                 println!("WM_CREATE");
-                let device_picker = DevicePicker::new().unwrap();
-                let initial: IInitializeWithWindow = device_picker.cast().unwrap();
-                initial.Initialize(window).unwrap();
-
-                let selector = AudioPlaybackConnection::GetDeviceSelector().unwrap();
-                device_picker
-                    .Filter()
-                    .unwrap()
-                    .SupportedDeviceSelectors()
-                    .unwrap()
-                    .Append(&selector)
-                    .unwrap();
-
-                println!("Picker show");
-                device_picker.Show(Rect::default()).unwrap();
-
                 LRESULT(0)
             }
             WM_DESTROY => {
                 println!("WM_DESTROY");
                 PostQuitMessage(0);
+
                 LRESULT(0)
             }
             _ => DefWindowProcA(window, message, wparam, lparam),
