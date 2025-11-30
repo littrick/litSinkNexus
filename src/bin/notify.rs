@@ -3,19 +3,18 @@ use tracing::log::*;
 use windows::{
     Win32::{
         Foundation::{GetLastError, HWND, LPARAM, LRESULT, WPARAM},
-        Graphics::Gdi::ValidateRect,
         System::LibraryLoader::GetModuleHandleW,
         UI::WindowsAndMessaging::{
             CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
             DispatchMessageW, GetMessageW, IDC_ARROW, IDI_APPLICATION, LoadCursorW, LoadIconW, MSG,
-            PostQuitMessage, RegisterClassW, WINDOW_EX_STYLE, WM_CREATE, WM_DESTROY, WM_PAINT,
-            WM_USER, WNDCLASSW, WS_OVERLAPPEDWINDOW, WS_VISIBLE,
+            PostQuitMessage, RegisterClassW, WINDOW_EX_STYLE, WM_CREATE, WM_DESTROY, WNDCLASSW,
+            WS_OVERLAPPEDWINDOW, WS_VISIBLE,
         },
     },
     core::w,
 };
 
-const WM_NOTIFYICON: u32 = WM_USER + 1;
+// const WM_NOTIFYICON: u32 = WM_USER + 1;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

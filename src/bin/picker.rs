@@ -1,9 +1,13 @@
 use windows::{
-    core::*, Devices::Enumeration::DevicePicker, Foundation::Rect, Media::Audio::AudioPlaybackConnection, Win32::{
+    Devices::Enumeration::DevicePicker,
+    Foundation::Rect,
+    Media::Audio::AudioPlaybackConnection,
+    Win32::{
         Foundation::*,
         System::LibraryLoader::GetModuleHandleA,
         UI::{Shell::IInitializeWithWindow, WindowsAndMessaging::*},
-    }
+    },
+    core::*,
 };
 
 fn main() -> Result<()> {

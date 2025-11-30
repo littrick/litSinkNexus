@@ -3,8 +3,12 @@ use std::env::set_var;
 use tracing::log::*;
 use windows::{
     Win32::{
-        Foundation::*, System::LibraryLoader::GetModuleHandleA,
-        UI::{HiDpi::{DPI_AWARENESS_SYSTEM_AWARE, GetDpiForWindow, PROCESS_PER_MONITOR_DPI_AWARE, SetProcessDpiAwareness, SetThreadDpiAwarenessContext}, WindowsAndMessaging::*},
+        Foundation::*,
+        System::LibraryLoader::GetModuleHandleA,
+        UI::{
+            HiDpi::{GetDpiForWindow, PROCESS_PER_MONITOR_DPI_AWARE, SetProcessDpiAwareness},
+            WindowsAndMessaging::*,
+        },
     },
     core::*,
 };
@@ -32,7 +36,7 @@ fn main() -> Result<()> {
         println!("atom = {atom}");
         debug_assert!(atom != 0);
 
-        let window = CreateWindowExW(
+        let _window = CreateWindowExW(
             WINDOW_EX_STYLE::default(),
             window_class,
             w!("Fuck world"),

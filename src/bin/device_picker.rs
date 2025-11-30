@@ -1,12 +1,14 @@
 use windows::{
     Devices::Enumeration::DevicePicker,
     Foundation::*,
-    UI::Popups::Placement,
     Win32::{
         Foundation::*,
         Graphics::Gdi::*,
         System::LibraryLoader::GetModuleHandleA,
-        UI::{HiDpi::*, Input::KeyboardAndMouse::VK_ESCAPE, Shell::IInitializeWithWindow, WindowsAndMessaging::*},
+        UI::{
+            HiDpi::*, Input::KeyboardAndMouse::VK_ESCAPE, Shell::IInitializeWithWindow,
+            WindowsAndMessaging::*,
+        },
     },
     core::*,
 };
@@ -105,7 +107,12 @@ fn show_picker(window: HWND, rect: Rect) -> anyhow::Result<()> {
         rect.Height,
     );
 
-    unsafe { device_picker.cast::<IInitializeWithWindow>().unwrap().Initialize(window) }?;
+    unsafe {
+        device_picker
+            .cast::<IInitializeWithWindow>()
+            .unwrap()
+            .Initialize(window)
+    }?;
 
     device_picker.Show(rect)?;
     // device_picker.ShowWithPlacement(rect, Placement::Left)?;
@@ -145,7 +152,7 @@ fn show_position(window: HWND) {
     let mut pt = POINT { x: 0, y: 0 };
     unsafe { GetCursorPos(&mut pt) }.unwrap();
 
-    let mut client_pt = pt.clone();
+    let mut client_pt = pt;
     unsafe { ScreenToClient(window, &mut client_pt) }.unwrap();
 
     log::debug!("ScreenCursor: X={} Y={}", pt.x, pt.y);
@@ -153,12 +160,15 @@ fn show_position(window: HWND) {
 
     // show picker at cursor position
     let scale = unsafe { GetDpiForWindow(window) } as f32 / USER_DEFAULT_SCREEN_DPI as f32;
-    show_picker(window,  Rect {
-        X: pt.x as f32 / scale,
-        Y: pt.y as f32 / scale,
-        Width: 0.0,
-        Height: 0.0
-    })
+    show_picker(
+        window,
+        Rect {
+            X: pt.x as f32 / scale,
+            Y: pt.y as f32 / scale,
+            Width: 0.0,
+            Height: 0.0,
+        },
+    )
     .unwrap();
 
     // paint rectangle at cursor position

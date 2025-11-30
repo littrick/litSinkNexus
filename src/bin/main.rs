@@ -1,7 +1,7 @@
 use tracing_perfetto::PerfettoLayer;
 use tracing_subscriber::{
     EnvFilter,
-    fmt::{self, format::FmtSpan},
+    fmt::{self},
     prelude::*,
 };
 use windows_play::app::Application;
@@ -20,5 +20,5 @@ fn main() {
         .with(filter_layer)
         .init();
 
-    Application::new().run().unwrap();
+    Application::run().unwrap();
 }

@@ -1,19 +1,16 @@
-use std::{fmt, slice::Windows};
-
 use anyhow::Context;
 use tracing::log;
-use tracing_subscriber::field::debug;
 use windows::{
-    Foundation::Uri,
+    Foundation::{Rect, Uri},
     System::Launcher,
     Win32::{
-        Foundation::{HWND, POINT},
-        UI::{Shell::*, WindowsAndMessaging::*},
+        Foundation::*,
+        UI::{HiDpi::GetDpiForWindow, Shell::*, WindowsAndMessaging::*},
     },
     core::*,
 };
 
-use crate::{app::connection_manager::ConnectionManager, prelude::*};
+use crate::{app::connection_manager::ConnectionManager, internal::*};
 
 #[derive(Debug)]
 pub struct MenuStrings {
@@ -32,7 +29,6 @@ impl Default for MenuStrings {
     }
 }
 
-#[derive(Default, Clone)]
 pub struct NotifyIcon {
     window: HWND,
     notify_icon_data: NOTIFYICONDATAW,
@@ -46,7 +42,7 @@ impl NotifyIcon {
     const IDM_CONNECTION: u32 = 1002;
     const IDM_DEVICES: u32 = 1003;
 
-    pub fn new(window: HWND, callback_message: u32, menu: MenuStrings) -> anyhow::Result<Self> {
+    pub fn new(window: HWND, callback_message: u32, strings: MenuStrings) -> anyhow::Result<Self> {
         let hmenu = unsafe { CreatePopupMenu() }.context("Failed to create popup menu")?;
 
         unsafe {
@@ -54,7 +50,7 @@ impl NotifyIcon {
                 hmenu,
                 MF_STRING,
                 Self::IDM_DEVICES as usize,
-                PCWSTR::from_raw(HSTRING::from(menu.bluetooth_list).as_ptr()),
+                PCWSTR::from_raw(HSTRING::from(strings.bluetooth_list).as_ptr()),
             )
         }?;
 
@@ -63,7 +59,7 @@ impl NotifyIcon {
                 hmenu,
                 MF_STRING,
                 Self::IDM_CONNECTION as usize,
-                PCWSTR::from_raw(HSTRING::from(menu.connection_list).as_ptr()),
+                PCWSTR::from_raw(HSTRING::from(strings.connection_list).as_ptr()),
             )
         }?;
 
@@ -74,19 +70,18 @@ impl NotifyIcon {
                 hmenu,
                 MF_STRING,
                 Self::IDM_EXIT as usize,
-                PCWSTR::from_raw(HSTRING::from(menu.exit).as_ptr()),
+                PCWSTR::from_raw(HSTRING::from(strings.exit).as_ptr()),
             )
         }?;
 
         Ok(Self {
             window,
             notify_icon_data: NOTIFYICONDATAW {
-                cbSize: size_of::<NOTIFYICONDATAW>() as u32,
                 hWnd: window,
                 uFlags: NIF_ICON | NIF_MESSAGE,
                 uCallbackMessage: callback_message,
                 Anonymous: NOTIFYICONDATAW_0 { uVersion: 4 },
-                hIcon: unsafe { LoadIconW(None, IDI_APPLICATION) }?,
+                hIcon: unsafe { LoadIconW(None, IDI_APPLICATION) }.unwrap(),
                 ..Default::default()
             },
             notify_icon_id: NOTIFYICONIDENTIFIER {
@@ -95,7 +90,7 @@ impl NotifyIcon {
                 ..Default::default()
             },
             menu: hmenu,
-            manager: ConnectionManager::new()?,
+            manager: ConnectionManager::new(window, Default::default())?,
         })
     }
 
@@ -104,12 +99,12 @@ impl NotifyIcon {
         unsafe { GetCursorPos(&mut point) }.context("Failed to get cursor position")?;
 
         // 需要先将窗口设为前台窗口，菜单才能正常工作
-        unsafe { SetForegroundWindow(self.window) }.unwrap();
+        unsafe { SetForegroundWindow(self.window) }.warn("Fail to set foreground window");
 
         unsafe {
             TrackPopupMenu(
                 self.menu,
-                TPM_RIGHTBUTTON,
+                TPM_BOTTOMALIGN,
                 point.x,
                 point.y,
                 Some(0),
@@ -126,6 +121,9 @@ impl NotifyIcon {
         unsafe { Shell_NotifyIconW(NIM_ADD, &self.notify_icon_data) }
             .context("Failed to add tray icon")?;
 
+        unsafe { Shell_NotifyIconW(NIM_SETVERSION, &self.notify_icon_data) }
+            .context("Fail to set NotifyIcon's Version")?;
+
         Ok(())
     }
 
@@ -136,13 +134,16 @@ impl NotifyIcon {
     }
 
     pub fn handle_message(&self, message: u32) -> anyhow::Result<()> {
+        // log::debug!("Notify Icon Message: {}", message);
         match message {
             WM_RBUTTONUP => {
-                log::info!("Notify Icon Right Button Up");
+                log::debug!("Notify Icon Right Button Up");
                 self.show_menu()?;
             }
             NIN_SELECT => {
-                log::info!("Notify Icon Select");
+                // Need NIM_SETVERSION to 4 to receive this message
+                log::debug!("Notify Icon Select");
+                self.show_connection_list()?;
             }
             _ => {}
         }
@@ -158,6 +159,7 @@ impl NotifyIcon {
             }
             Self::IDM_CONNECTION => {
                 log::info!("Open connection list menu item clicked");
+                self.show_connection_list()?;
             }
             Self::IDM_EXIT => {
                 unsafe { PostQuitMessage(0) };
@@ -165,5 +167,20 @@ impl NotifyIcon {
             _ => {}
         }
         Ok(())
+    }
+
+    fn show_connection_list(&self) -> anyhow::Result<()> {
+        let rect = unsafe { Shell_NotifyIconGetRect(&self.notify_icon_id) }
+            .context("Fail to get notify icon rect")?;
+        let scale = unsafe { GetDpiForWindow(self.window) } as f32 / USER_DEFAULT_SCREEN_DPI as f32;
+
+        self.manager
+            .show(Rect {
+                X: rect.left as f32 / scale,
+                Y: rect.top as f32 / scale,
+                Width: (rect.right - rect.left) as f32 / scale,
+                Height: (rect.bottom - rect.top) as f32 / scale,
+            })
+            .context("Fail to show popup of connections")
     }
 }

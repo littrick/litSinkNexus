@@ -1,12 +1,11 @@
-use tracing::log::info;
 use std::{collections::HashMap, mem::size_of, sync::Mutex};
+use tracing::log::info;
 
 use windows::{
     Devices::Enumeration::*,
     Foundation::*,
     Media::Audio::*,
     System::Launcher,
-    UI::Popups::Placement,
     Win32::{
         Foundation::*,
         Graphics::Gdi::*,
@@ -52,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
         unsafe { GetLastError() }
     );
 
-    let window = unsafe {
+    let _window = unsafe {
         CreateWindowExW(
             WINDOW_EX_STYLE::default(),
             window_class.lpszClassName,
@@ -83,8 +82,6 @@ async fn main() -> anyhow::Result<()> {
 
 extern "system" fn wnproc(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     // info!("{}:{} message: 0x{message:X} wparam: 0x{:X} lparam: 0x{:X}", file!(), line!(), wparam.0, lparam.0);
-
-    let mut result = LRESULT(0);
 
     let notify_icon_data = NOTIFYICONDATAW {
         hWnd: window,
@@ -159,10 +156,10 @@ extern "system" fn wnproc(window: HWND, message: u32, wparam: WPARAM, lparam: LP
                 _ => {}
             }
         }
-        _ => result = unsafe { DefWindowProcW(window, message, wparam, lparam) },
+        _ => {},
     };
 
-    result
+    unsafe { DefWindowProcW(window, message, wparam, lparam) }
 
     // LRESULT(0)
 }
@@ -210,6 +207,16 @@ fn show_device_picker(hwnd: HWND) {
     info!("显示设备选择器");
     let selector = AudioPlaybackConnection::GetDeviceSelector().unwrap();
     let device_picker = DevicePicker::new().unwrap();
+    // 选择音频播放设备
+
+    device_picker
+        .Filter()
+        .unwrap()
+        .SupportedDeviceSelectors()
+        .unwrap()
+        .Append(&selector)
+        .unwrap();
+
     let all_devices = DeviceInformation::FindAllAsyncAqsFilter(&selector)
         .unwrap()
         .join()
@@ -227,16 +234,6 @@ fn show_device_picker(hwnd: HWND) {
             )
             .unwrap();
     }
-
-    // 选择音频播放设备
-
-    device_picker
-        .Filter()
-        .unwrap()
-        .SupportedDeviceSelectors()
-        .unwrap()
-        .Append(&selector)
-        .unwrap();
 
     device_picker
         .DeviceSelected(
@@ -273,7 +270,7 @@ fn show_device_picker(hwnd: HWND) {
                     connection
                         .StateChanged(&TypedEventHandler::<AudioPlaybackConnection, _>::new(
                             |sender, _| {
-                                let connection = sender.as_ref().unwrap();
+                                let _connection = sender.as_ref().unwrap();
                                 let state = sender.as_ref().unwrap().State().unwrap();
                                 match state {
                                     AudioPlaybackConnectionState::Opened => {

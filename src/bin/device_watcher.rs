@@ -1,4 +1,4 @@
-use windows::{core::*, Devices::Enumeration::*, Foundation::*};
+use windows::{Devices::Enumeration::*, Foundation::*, core::*};
 
 fn main() -> Result<()> {
     let watcher = DeviceInformation::CreateWatcher()?;
@@ -18,14 +18,19 @@ fn main() -> Result<()> {
     watcher.Start()?;
     std::thread::sleep(std::time::Duration::new(10, 0));
 
-
     let picker = DevicePicker::new()?;
-    picker.DeviceSelected(&TypedEventHandler::<DevicePicker, DeviceSelectedEventArgs>::new(
-        |sender, args|  {
-            let device_name = args.as_ref().unwrap().SelectedDevice().unwrap().Name().unwrap();
+    picker.DeviceSelected(
+        &TypedEventHandler::<DevicePicker, DeviceSelectedEventArgs>::new(|_, args| {
+            let device_name = args
+                .as_ref()
+                .unwrap()
+                .SelectedDevice()
+                .unwrap()
+                .Name()
+                .unwrap();
             println!("Selected device: {}", device_name);
             Ok(())
-        }
-    ))?;
+        }),
+    )?;
     Ok(())
 }

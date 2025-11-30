@@ -1,19 +1,9 @@
 mod connection_manager;
-mod context;
 mod notify_icon;
 
 use anyhow::Context;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-    thread::sleep,
-    time::Duration,
-};
-use tracing::{Level, log, span, trace_span};
+use tracing::{log, trace_span};
 use windows::{
-    Devices::Enumeration::DevicePicker,
-    Foundation::*,
-    Media::Audio::*,
     Win32::{
         Foundation::*,
         Graphics::Gdi::UpdateWindow,
@@ -23,57 +13,53 @@ use windows::{
     core::*,
 };
 
-use crate::{
-    app::notify_icon::{MenuStrings, NotifyIcon},
-    prelude::*,
-};
+use crate::{app::notify_icon::NotifyIcon, internal::*};
 
-#[derive(Default, Clone)]
 pub struct Application {
     window: HWND,
-    notify_icon: NotifyIcon,
+    notify_icon: Option<NotifyIcon>,
 }
 
 impl Application {
-    const CLASS_NAME: &str = env!("CARGO_PKG_NAME");
     const WM_NOTIFYICON: u32 = WM_USER + 1;
 
-    #[tracing::instrument]
-    pub fn new() -> Self {
-        Default::default()
-    }
+    pub fn run() -> anyhow::Result<Self> {
+        let window = HWND::default();
+        let app = Self {
+            window,
+            notify_icon: None,
+        };
 
-    // #[tracing::instrument]
-    pub fn run(&self) -> anyhow::Result<()> {
         let module = unsafe { GetModuleHandleW(None) }
             .context("Fail to get HMODULE handle for the current application")?;
 
         let instance = HINSTANCE::from(module);
 
-        let class_name = PCWSTR::from_raw(HSTRING::from(Self::CLASS_NAME).as_ptr());
         let cursor =
             unsafe { LoadCursorW(None, IDC_ARROW) }.context("Failed to load arrow cursor")?;
 
+        let class_name = HSTRING::from(Self::class_name());
         let window_class = WNDCLASSEXW {
             cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
             hCursor: cursor,
             hInstance: instance,
-            lpszClassName: class_name,
+            lpszClassName: PCWSTR::from_raw(class_name.as_ptr()),
             style: CS_HREDRAW | CS_VREDRAW,
             lpfnWndProc: Some(Self::wndproc),
             ..Default::default()
         };
 
+        log::debug!("Registering window class {:?}", Self::class_name());
         let atom = unsafe { RegisterClassExW(&window_class) };
         if atom == 0 {
             return win_error("Failed to register window class");
         }
 
         let window = unsafe {
+            let class_name = HSTRING::from(Self::class_name());
             CreateWindowExW(
-                // WINDOW_EX_STYLE::default(),
                 WS_EX_LAYERED,
-                class_name,
+                PCWSTR::from_raw(class_name.as_ptr()),
                 w!(""),
                 WS_POPUP,
                 0,
@@ -83,31 +69,30 @@ impl Application {
                 None,
                 None,
                 Some(instance),
-                Some(self as *const _ as *const _),
+                Some(&app as *const _ as *const _),
             )
         }
+        // .context("Failed to create application window")?;
         .context("Failed to create application window")?;
 
         // let _ = unsafe { ShowWindow(window, SW_SHOW) };
         let _ = unsafe { UpdateWindow(window) };
 
         let mut msg = MSG::default();
-
         while (unsafe { GetMessageW(&mut msg, None, 0, 0) }).into() {
-            let span = trace_span!("message_loop");
-            let _guard = span.enter();
             let _ = unsafe { TranslateMessage(&msg) };
             unsafe { DispatchMessageW(&msg) };
         }
 
-        Ok(())
+        Ok(app)
     }
 
     // #[tracing::instrument]
     fn handle_message(&self, message: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         match message {
             WM_DESTROY => {
-                self.notify_icon.delete().unwrap();
+                self.notify_icon.as_ref().unwrap().delete().unwrap();
+                unsafe { PostQuitMessage(0) };
             }
             WM_KEYDOWN => {
                 // Handle ESC key to quit application
@@ -120,21 +105,33 @@ impl Application {
                 }
             }
             Self::WM_NOTIFYICON => {
-                log::info!("Notify Icon Message: {}", lparam.0 as u32);
-                self.notify_icon.handle_message(lparam.0 as u32).unwrap();
+                self.notify_icon
+                    .as_ref()
+                    .unwrap()
+                    .handle_message(lparam.0 as u32)
+                    .unwrap();
             }
             WM_COMMAND => {
                 self.notify_icon
+                    .as_ref()
+                    .unwrap()
                     .handle_command((wparam.0 & 0xffff) as u32)
                     .unwrap();
             }
-            _ => {}
+            _ => {
+                return unsafe { DefWindowProcW(self.window, message, wparam, lparam) };
+            }
         }
 
-        unsafe { DefWindowProcW(self.window, message, wparam, lparam) }
+        // unsafe { DefWindowProcW(self.window, message, wparam, lparam) }
+        LRESULT(0)
     }
 
-    #[tracing::instrument]
+    fn class_name() -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    // #[tracing::instrument]
     extern "system" fn wndproc(
         window: HWND,
         message: u32,
@@ -148,11 +145,10 @@ impl Application {
                 if !this.is_null() {
                     (*this).window = window;
                     let notify_icon =
-                        NotifyIcon::new(window, Self::WM_NOTIFYICON, MenuStrings::default())
-                            .unwrap();
+                        NotifyIcon::new(window, Self::WM_NOTIFYICON, Default::default()).unwrap();
 
                     notify_icon.add().unwrap();
-                    (*this).notify_icon = notify_icon;
+                    (*this).notify_icon = Some(notify_icon);
 
                     SetWindowLongPtrW(window, GWLP_USERDATA, this as isize);
                 }
