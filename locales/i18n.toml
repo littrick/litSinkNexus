@@ -1,0 +1,56 @@
+_version = 2
+
+[connection_manager.connected]
+en = "Connected"
+zh-CN = "已连接"
+zh-TW = "已連線"
+
+[connection_manager.connecting]
+en = "Connecting..."
+zh-CN = "正在连接..."
+zh-TW = "正在連線..."
+
+[connection_manager.picker_title]
+en = "A2DP Sink: Select a source device"
+zh-CN = "A2DP Sink: 选择源设备"
+zh-TW = "A2DP Sink: 選擇來源裝置"
+
+[connection_manager.denied_by_system]
+en = "Connection Denied by System"
+zh-CN = "系统拒绝连接"
+zh-TW = "系統拒絕連線"
+
+[connection_manager.disconnected]
+en = "Disconnected"
+zh-CN = "已断开"
+zh-TW = "已斷開"
+
+[connection_manager.not_found]
+en = "Device not found"
+zh-CN = "未找到设备"
+zh-TW = "未找到裝置"
+
+[connection_manager.timeout]
+en = "Connection Timeout"
+zh-CN = "连接超时"
+zh-TW = "連線逾時"
+
+[connection_manager.unknown_reason]
+en = "Unknown Reason"
+zh-CN = "未知原因"
+zh-TW = "未知原因"
+
+[notify_icon.connection_list]
+en = "Open Connection List(&C)"
+zh-CN = "打开连接列表(&C)"
+zh-TW = "打開連線列表(&C)"
+
+[notify_icon.bluetooth_list]
+en = "Add Bluetooth Device(&B)"
+zh-CN = "添加蓝牙设备(&B)"
+zh-TW = "添加藍牙裝置(&B)"
+
+[notify_icon.exit]
+en = "Exit(&E)"
+zh-CN = "退出(&E)"
+zh-TW = "退出(&E)"

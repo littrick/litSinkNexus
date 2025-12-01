@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
+use windows::Win32::Foundation::HWND;
 use windows::core::{BOOL, HRESULT};
 use windows::core::{Error, Result};
-
 
 pub fn win_error<C, T>(msg: C) -> anyhow::Result<T>
 where
@@ -66,6 +66,17 @@ impl<T> WarnExt for Result<T> {
     }
 }
 
+impl<T> WarnExt for anyhow::Result<T> {
+    fn warn<C>(self, msg: C)
+    where
+        C: Display + Send + Sync + 'static,
+    {
+        if let Err(e) = self {
+            tracing::log::warn!("{}: {:?}", msg, e);
+        }
+    }
+}
+
 pub trait WinBoolExt {
     fn context<C>(self, msg: C) -> anyhow::Result<()>
     where
@@ -95,4 +106,18 @@ impl<T> ToWinResult<T> for anyhow::Result<T> {
     }
 }
 
+/// 为HWND实现Send和Sync
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WndHandle(HWND);
 
+impl WndHandle {
+    pub fn new(hwnd: HWND) -> Self {
+        Self(hwnd)
+    }
+
+    pub fn hwnd(&self) -> HWND {
+        self.0
+    }
+}
+unsafe impl Send for WndHandle {}
+unsafe impl Sync for WndHandle {}

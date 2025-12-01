@@ -1,3 +1,4 @@
+use crate::internal::*;
 use anyhow::Context;
 use std::{
     collections::HashMap,
@@ -15,29 +16,27 @@ use windows::{
     core::*,
 };
 
-use crate::internal::*;
-
 #[derive(Debug, Clone)]
 pub struct DeviceStatusStrings {
-    connection_list_title: String,
-    connecting: String,
-    connected: String,
-    timeout: String,
-    denied_by_system: String,
-    unknown_failure: String,
-    unknown_reason: String,
-    disconnected: String,
+    pub picker_title: String,
+    pub connecting: String,
+    pub connected: String,
+    pub timeout: String,
+    pub denied_by_system: String,
+    pub not_found: String,
+    pub unknown_reason: String,
+    pub disconnected: String,
 }
 
 impl Default for DeviceStatusStrings {
     fn default() -> Self {
         Self {
-            connection_list_title: "Connection List".to_string(),
+            picker_title: "A2DP Sink: Click to select a source device ".to_string(),
             connecting: "Connecting".to_string(),
             connected: "Connected".to_string(),
             timeout: "Connection Timeout".to_string(),
             denied_by_system: "Connection Denied by System".to_string(),
-            unknown_failure: "Unknown Connection Failure".to_string(),
+            not_found: "Device not found".to_string(),
             unknown_reason: "Unknown Reason".to_string(),
             disconnected: "Disconnected".to_string(),
         }
@@ -46,6 +45,7 @@ impl Default for DeviceStatusStrings {
 
 #[derive(Debug)]
 struct ConnectionContext {
+    window: WndHandle,
     picker: DevicePicker,
     connections: Mutex<HashMap<HSTRING, (DeviceInformation, AudioPlaybackConnection)>>,
     strings: DeviceStatusStrings,
@@ -53,16 +53,14 @@ struct ConnectionContext {
 
 #[derive(Debug)]
 pub struct ConnectionManager {
-    window: HWND,
     context: Arc<ConnectionContext>,
 }
 
 impl ConnectionManager {
     pub fn new(window: HWND, strings: DeviceStatusStrings) -> anyhow::Result<Self> {
         let manager = Self {
-            window,
-
             context: Arc::new(ConnectionContext {
+                window: WndHandle::new(window),
                 connections: Default::default(),
                 picker: DevicePicker::new().context("Failed to create DevicePicker")?,
                 strings,
@@ -85,7 +83,7 @@ impl ConnectionManager {
 
         unsafe {
             SetWindowPos(
-                self.window,
+                self.context.window.hwnd(),
                 Some(HWND_TOPMOST),
                 0,
                 0,
@@ -101,12 +99,14 @@ impl ConnectionManager {
     }
 
     fn init_picker(&self) -> anyhow::Result<()> {
+        let context = &self.context;
+        let picker = &self.context.picker;
+
         unsafe {
-            self.context
-                .picker
+            picker
                 .cast::<IInitializeWithWindow>()
                 .unwrap()
-                .Initialize(self.window)
+                .Initialize(context.window.hwnd())
         }?;
 
         let selector = AudioPlaybackConnection::GetDeviceSelector()?;
@@ -119,8 +119,7 @@ impl ConnectionManager {
         for device in all_device {
             log::debug!("Clearing device: {}({})", device.Name()?, device.Id()?);
 
-            self.context
-                .picker
+            picker
                 .SetDisplayStatus(
                     &device,
                     &HSTRING::from(""),
@@ -129,8 +128,7 @@ impl ConnectionManager {
                 .context("Fail to clear picker display status")?;
         }
 
-        self.context
-            .picker
+        picker
             .Filter()
             .context("Fail to get DevicePickerFilter")?
             .SupportedDeviceSelectors()
@@ -138,31 +136,29 @@ impl ConnectionManager {
             .Append(&selector)
             .context("Fail to append selector")?;
 
-        self.context
-            .picker
+        picker
             .DeviceSelected(&{
-                let context = self.context.clone();
+                let context = context.clone();
                 TypedEventHandler::<_, DeviceSelectedEventArgs>::new(move |_, args| {
                     let device = args.as_ref().unwrap().SelectedDevice()?;
 
-                    log::debug!("Device selected: {}({})", device.Name()?, device.Id()?);
-
+                    log::info!("Connecting to: {}({})", device.Name()?, device.Id()?);
                     Self::connect(context.clone(), &device).to_win_result()
                 })
             })
             .context("Fail to set DeviceSeleted callback")?;
 
-        self.context
-            .picker
+        picker
             .DisconnectButtonClicked(&{
-                let context = self.context.clone();
+                let context = context.clone();
                 TypedEventHandler::<_, DeviceDisconnectButtonClickedEventArgs>::new(
                     move |_, args| {
                         let device = args.as_ref().unwrap().Device()?;
                         let device_id = device.Id().unwrap();
                         log::info!(
-                            "Disconnecting device: {}",
-                            device.Name().unwrap_or(HSTRING::from("(Unknown)"))
+                            "Disconnecting device: {}({})",
+                            device.Name().unwrap_or(HSTRING::from("(Unknown)")),
+                            device_id
                         );
 
                         context.connections.lock().unwrap().remove(&device_id);
@@ -181,18 +177,32 @@ impl ConnectionManager {
             })
             .context("Fail to set DisconnectButtonClicked callback")?;
 
-        self.context
-            .picker
-            .DevicePickerDismissed(&TypedEventHandler::new(move |_, _| {
-                log::debug!("Device Picker Dismissed");
-                Ok(())
-            }))
+        picker
+            .DevicePickerDismissed(&{
+                let context = context.clone();
+                TypedEventHandler::new(move |_, _| {
+                    log::debug!("Device Picker Dismissed");
+
+                    unsafe {
+                        SetWindowPos(
+                            context.window.hwnd(),
+                            None,
+                            0,
+                            0,
+                            0,
+                            0,
+                            SWP_HIDEWINDOW | SWP_NOZORDER,
+                        )
+                    }?;
+
+                    Ok(())
+                })
+            })
             .context("Fail to set DevicePickerDismissed callback")?;
 
-        self.context
-            .picker
+        picker
             .Appearance()?
-            .SetTitle(&HSTRING::from(&self.context.strings.connection_list_title))?;
+            .SetTitle(&HSTRING::from(&context.strings.picker_title))?;
 
         Ok(())
     }
@@ -230,7 +240,11 @@ impl ConnectionManager {
             .Status()?
         {
             AudioPlaybackConnectionOpenResultStatus::Success => {
-                log::info!("Connected to device: {}", device_id);
+                log::info!(
+                    "Device connected: {}({})",
+                    device.Name().unwrap_or(HSTRING::from("(Unknown)")),
+                    device_id
+                );
                 context
                     .connections
                     .lock()
@@ -252,7 +266,7 @@ impl ConnectionManager {
             AudioPlaybackConnectionOpenResultStatus::UnknownFailure => {
                 context.picker.SetDisplayStatus(
                     device,
-                    &HSTRING::from(&context.strings.unknown_failure),
+                    &HSTRING::from(&context.strings.not_found), // Error reported here when device cannot be scanned
                     DevicePickerDisplayStatusOptions::ShowRetryButton,
                 )?;
             }
@@ -282,19 +296,20 @@ impl ConnectionManager {
     ) {
         match state {
             AudioPlaybackConnectionState::Opened => {
-                log::info!(
-                    "Device opened: {}",
-                    connection.DeviceId().unwrap().to_string_lossy()
-                );
+                log::debug!("Device opened: {}", connection.DeviceId().unwrap());
             }
             AudioPlaybackConnectionState::Closed => {
                 let device_id = connection.DeviceId().unwrap();
-
-                log::info!("AudioPlaybackConnection closed: {}", device_id);
-
+                log::debug!("AudioPlaybackConnection closed: {}", device_id);
                 let connection = context.connections.lock().unwrap().remove(&device_id);
 
                 if let Some((device, _)) = connection {
+                    log::info!(
+                        "Device disconnected: {}({})",
+                        device.Name().unwrap_or(HSTRING::from("(Unknown)")),
+                        device_id
+                    );
+
                     context
                         .picker
                         .SetDisplayStatus(
