@@ -1,19 +1,20 @@
 mod connection_manager;
 mod notify_icon;
-
+use std::cell::LazyCell;
+use crate::{
+    app::notify_icon::{MenuStrings, NotifyIcon},
+    internal::*,
+};
 use anyhow::Context;
-use tracing::{log, trace_span};
+use rust_i18n::t;
+use tracing::log;
 use windows::{
     Win32::{
-        Foundation::*,
-        Graphics::Gdi::UpdateWindow,
-        System::LibraryLoader::GetModuleHandleW,
-        UI::{Input::KeyboardAndMouse::VK_ESCAPE, WindowsAndMessaging::*},
+        Foundation::*, Graphics::Gdi::UpdateWindow, System::LibraryLoader::GetModuleHandleW,
+        UI::WindowsAndMessaging::*,
     },
     core::*,
 };
-
-use crate::{app::notify_icon::NotifyIcon, internal::*};
 
 pub struct Application {
     window: HWND,
@@ -21,7 +22,11 @@ pub struct Application {
 }
 
 impl Application {
+    const CLASS_NAME: LazyCell<&'static str> = LazyCell::new(|| std::any::type_name::<Self>());
     const WM_NOTIFYICON: u32 = WM_USER + 1;
+    const WM_NOTIFYICON_SHOW_PICKER: u32 = WM_USER + 2;
+    const WM_TASKBAR_CREATED: LazyCell<u32> =
+        LazyCell::new(|| unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) });
 
     pub fn run() -> anyhow::Result<Self> {
         let window = HWND::default();
@@ -38,7 +43,7 @@ impl Application {
         let cursor =
             unsafe { LoadCursorW(None, IDC_ARROW) }.context("Failed to load arrow cursor")?;
 
-        let class_name = HSTRING::from(Self::class_name());
+        let class_name = HSTRING::from(*Self::CLASS_NAME);
         let window_class = WNDCLASSEXW {
             cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
             hCursor: cursor,
@@ -49,14 +54,14 @@ impl Application {
             ..Default::default()
         };
 
-        log::debug!("Registering window class {:?}", Self::class_name());
+        log::debug!("Registering window class {:?}", *Self::CLASS_NAME);
         let atom = unsafe { RegisterClassExW(&window_class) };
         if atom == 0 {
             return win_error("Failed to register window class");
         }
 
         let window = unsafe {
-            let class_name = HSTRING::from(Self::class_name());
+            let class_name = HSTRING::from(*Self::CLASS_NAME);
             CreateWindowExW(
                 WS_EX_LAYERED,
                 PCWSTR::from_raw(class_name.as_ptr()),
@@ -94,22 +99,21 @@ impl Application {
                 self.notify_icon.as_ref().unwrap().delete().unwrap();
                 unsafe { PostQuitMessage(0) };
             }
-            WM_KEYDOWN => {
-                // Handle ESC key to quit application
-                let s = trace_span!("WM_KEYDOWN");
-                let _guard = s.enter();
-
-                log::info!("Key down: {:?}", wparam.0 as u32);
-                if wparam.0 as u32 == VK_ESCAPE.0.into() {
-                    unsafe { PostQuitMessage(0) };
-                }
-            }
             Self::WM_NOTIFYICON => {
                 self.notify_icon
                     .as_ref()
                     .unwrap()
                     .handle_message(lparam.0 as u32)
                     .unwrap();
+            }
+            Self::WM_NOTIFYICON_SHOW_PICKER => {
+                let x = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+                let y = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+                self.notify_icon
+                    .as_ref()
+                    .unwrap()
+                    .show_picker(x, y)
+                    .warn("Fail to show device picker");
             }
             WM_COMMAND => {
                 self.notify_icon
@@ -118,6 +122,11 @@ impl Application {
                     .handle_command((wparam.0 & 0xffff) as u32)
                     .unwrap();
             }
+            msg if msg == *Self::WM_TASKBAR_CREATED => {
+                // when explorer.exe restarts, the taskbar is recreated, need to re-add the notify icon
+                log::debug!("Taskbar recreated, re-adding notify icon");
+                self.notify_icon.as_ref().unwrap().add().unwrap();
+            }
             _ => {
                 return unsafe { DefWindowProcW(self.window, message, wparam, lparam) };
             }
@@ -125,10 +134,6 @@ impl Application {
 
         // unsafe { DefWindowProcW(self.window, message, wparam, lparam) }
         LRESULT(0)
-    }
-
-    fn class_name() -> &'static str {
-        std::any::type_name::<Self>()
     }
 
     // #[tracing::instrument]
@@ -144,13 +149,28 @@ impl Application {
                 let this = createstruct.lpCreateParams as *mut Self;
                 if !this.is_null() {
                     (*this).window = window;
-                    let notify_icon =
-                        NotifyIcon::new(window, Self::WM_NOTIFYICON, Default::default()).unwrap();
+                    let notify_icon = NotifyIcon::new(
+                        window,
+                        Self::WM_NOTIFYICON,
+                        MenuStrings {
+                            bluetooth_list: t!("notify_icon.bluetooth_list").to_string(),
+                            connection_list: t!("notify_icon.connection_list").to_string(),
+                            exit: t!("notify_icon.exit").to_string(),
+                        },
+                    )
+                    .unwrap();
 
                     notify_icon.add().unwrap();
                     (*this).notify_icon = Some(notify_icon);
-
                     SetWindowLongPtrW(window, GWLP_USERDATA, this as isize);
+
+                    PostMessageW(
+                        Some(window),
+                        Self::WM_NOTIFYICON_SHOW_PICKER,
+                        WPARAM(0),
+                        LPARAM(0),
+                    )
+                    .warn("Fail to post show picker message");
                 }
             } else {
                 let this = GetWindowLongPtrW(window, GWLP_USERDATA) as *mut Self;

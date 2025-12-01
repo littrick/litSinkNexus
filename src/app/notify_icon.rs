@@ -1,4 +1,9 @@
+use crate::{
+    app::connection_manager::{ConnectionManager, DeviceStatusStrings},
+    internal::*,
+};
 use anyhow::Context;
+use rust_i18n::t;
 use tracing::log;
 use windows::{
     Foundation::{Rect, Uri},
@@ -10,20 +15,18 @@ use windows::{
     core::*,
 };
 
-use crate::{app::connection_manager::ConnectionManager, internal::*};
-
 #[derive(Debug)]
 pub struct MenuStrings {
-    bluetooth_list: String,
-    connection_list: String,
-    exit: String,
+    pub connection_list: String,
+    pub bluetooth_list: String,
+    pub exit: String,
 }
 
 impl Default for MenuStrings {
     fn default() -> Self {
         Self {
-            bluetooth_list: "Add Bluetooth Device(&B)".to_string(),
             connection_list: "Open Connection List(&C)".to_string(),
+            bluetooth_list: "Add Bluetooth Device(&B)".to_string(),
             exit: "Exit(&X)".to_string(),
         }
     }
@@ -31,7 +34,7 @@ impl Default for MenuStrings {
 
 pub struct NotifyIcon {
     window: HWND,
-    notify_icon_data: NOTIFYICONDATAW,
+    data: NOTIFYICONDATAW,
     notify_icon_id: NOTIFYICONIDENTIFIER,
     manager: ConnectionManager,
     menu: HMENU,
@@ -49,8 +52,8 @@ impl NotifyIcon {
             AppendMenuW(
                 hmenu,
                 MF_STRING,
-                Self::IDM_DEVICES as usize,
-                PCWSTR::from_raw(HSTRING::from(strings.bluetooth_list).as_ptr()),
+                Self::IDM_CONNECTION as usize,
+                PCWSTR::from_raw(HSTRING::from(strings.connection_list).as_ptr()),
             )
         }?;
 
@@ -58,8 +61,8 @@ impl NotifyIcon {
             AppendMenuW(
                 hmenu,
                 MF_STRING,
-                Self::IDM_CONNECTION as usize,
-                PCWSTR::from_raw(HSTRING::from(strings.connection_list).as_ptr()),
+                Self::IDM_DEVICES as usize,
+                PCWSTR::from_raw(HSTRING::from(strings.bluetooth_list).as_ptr()),
             )
         }?;
 
@@ -76,21 +79,34 @@ impl NotifyIcon {
 
         Ok(Self {
             window,
-            notify_icon_data: NOTIFYICONDATAW {
+            data: NOTIFYICONDATAW {
                 hWnd: window,
-                uFlags: NIF_ICON | NIF_MESSAGE,
+                uFlags: NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP,
                 uCallbackMessage: callback_message,
                 Anonymous: NOTIFYICONDATAW_0 { uVersion: 4 },
                 hIcon: unsafe { LoadIconW(None, IDI_APPLICATION) }.unwrap(),
                 ..Default::default()
-            },
+            }
+            .into(),
             notify_icon_id: NOTIFYICONIDENTIFIER {
                 cbSize: size_of::<NOTIFYICONIDENTIFIER>() as u32,
                 hWnd: window,
                 ..Default::default()
             },
             menu: hmenu,
-            manager: ConnectionManager::new(window, Default::default())?,
+            manager: ConnectionManager::new(
+                window,
+                DeviceStatusStrings {
+                    picker_title: t!("connection_manager.picker_title").to_string(),
+                    timeout: t!("connection_manager.timeout").to_string(),
+                    connecting: t!("connection_manager.connecting").to_string(),
+                    connected: t!("connection_manager.connected").to_string(),
+                    denied_by_system: t!("connection_manager.denied_by_system").to_string(),
+                    not_found: t!("connection_manager.not_found").to_string(),
+                    unknown_reason: t!("connection_manager.unknown_reason").to_string(),
+                    disconnected: t!("connection_manager.disconnected").to_string(),
+                },
+            )?,
         })
     }
 
@@ -117,18 +133,27 @@ impl NotifyIcon {
         Ok(())
     }
 
-    pub fn add(&self) -> anyhow::Result<()> {
-        unsafe { Shell_NotifyIconW(NIM_ADD, &self.notify_icon_data) }
-            .context("Failed to add tray icon")?;
+    pub fn show_picker(&self, x: i32, y: i32) -> anyhow::Result<()> {
+        self.manager
+            .show(Rect {
+                X: x as f32,
+                Y: y as f32,
+                Width: 0.0,
+                Height: 0.0,
+            })
+            .context("Fail to show device picker")
+    }
 
-        unsafe { Shell_NotifyIconW(NIM_SETVERSION, &self.notify_icon_data) }
+    pub fn add(&self) -> anyhow::Result<()> {
+        unsafe { Shell_NotifyIconW(NIM_ADD, &self.data) }.context("Failed to add tray icon")?;
+        unsafe { Shell_NotifyIconW(NIM_SETVERSION, &self.data) }
             .context("Fail to set NotifyIcon's Version")?;
 
         Ok(())
     }
 
     pub fn delete(&self) -> anyhow::Result<()> {
-        unsafe { Shell_NotifyIconW(NIM_DELETE, &self.notify_icon_data) }
+        unsafe { Shell_NotifyIconW(NIM_DELETE, &self.data) }
             .context("Failed to remove tray icon")?;
         Ok(())
     }
