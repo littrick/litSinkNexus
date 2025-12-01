@@ -1,8 +1,43 @@
 use std::fmt::Display;
+use tracing::log;
+use windows::Win32::{Foundation::*, Globalization::*};
+use windows::core::*;
 
-use windows::Win32::Foundation::HWND;
-use windows::core::{BOOL, HRESULT};
-use windows::core::{Error, Result};
+pub fn init_i18n() {
+    let langs = user_preferred_languages();
+
+    log::debug!("User preferred UI languages: {:?}", langs);
+
+    if let Some(lang) = langs.first() {
+        rust_i18n::set_locale(lang);
+        log::debug!("Set locale to {}", lang);
+    }
+}
+
+fn user_preferred_languages() -> Vec<String> {
+    let mut language = [0u16; 128];
+    let mut pcc = language.len() as u32;
+    let mut number = 0u32;
+
+    unsafe {
+        GetUserPreferredUILanguages(
+            MUI_LANGUAGE_NAME,
+            &mut number,
+            Some(PWSTR::from_raw(language.as_mut_ptr())),
+            &mut pcc,
+        )
+    }
+    .unwrap();
+
+    // Split the language array, which is null-terminated, into `number` PCWSTR strings
+    let languages = language[..pcc as usize]
+        .split(|&c| c == 0)
+        .take(number as usize)
+        .map(|lang| unsafe { PCWSTR::from_raw(lang.as_ptr()).to_string() }.unwrap())
+        .collect();
+
+    languages
+}
 
 pub fn win_error<C, T>(msg: C) -> anyhow::Result<T>
 where

@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::Command};
+use std::{fs, path::PathBuf, process::Command};
 
 use embed_manifest::{
     embed_manifest, empty_manifest,
@@ -16,11 +16,18 @@ fn main() {
 
     println!("cargo:rerun-if-changed=build.rs");
 
+    check_i18n();
+}
+
+fn check_i18n() {
+    let todo_file = "i18n/TODO.yml";
+
+    fs::remove_file(todo_file).ok();
     Command::new("cargo").args(&["i18n"]).status().ok();
-    PathBuf::from("locales/TODO.yml").exists().then(|| {
-        panic!("Please resolve all TODOs in locales/TODO.yml before building.");
+    PathBuf::from(todo_file).exists().then(|| {
+        panic!("Please resolve all TODOs in {todo_file} before building.");
     });
 
     println!("cargo:rerun-if-changed=config.toml");
-    println!("cargo:rerun-if-changed=locales/i18n.toml");
+    println!("cargo:rerun-if-changed={todo_file}");
 }
