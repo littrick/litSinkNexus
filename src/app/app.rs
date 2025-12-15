@@ -1,12 +1,10 @@
-mod connection_manager;
-mod notify_icon;
-use std::cell::LazyCell;
 use crate::{
-    app::notify_icon::{MenuStrings, NotifyIcon},
+    app::{config::AppConfig, notify_icon::{MenuStrings, NotifyIcon}},
     internal::*,
 };
 use anyhow::Context;
 use rust_i18n::t;
+use std::{cell::LazyCell, sync::Arc};
 use tracing::log;
 use windows::{
     Win32::{
@@ -18,6 +16,7 @@ use windows::{
 
 pub struct Application {
     window: HWND,
+    config: Arc<AppConfig>,
     notify_icon: Option<NotifyIcon>,
 }
 
@@ -28,10 +27,11 @@ impl Application {
     const WM_TASKBAR_CREATED: LazyCell<u32> =
         LazyCell::new(|| unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) });
 
-    pub fn run() -> anyhow::Result<Self> {
+    pub fn run(config: AppConfig) -> anyhow::Result<Self> {
         let window = HWND::default();
         let app = Self {
             window,
+            config: Arc::new(config),
             notify_icon: None,
         };
 
@@ -151,11 +151,13 @@ impl Application {
                     (*this).window = window;
                     let notify_icon = NotifyIcon::new(
                         window,
+                        (*this).config.clone(),
                         Self::WM_NOTIFYICON,
                         MenuStrings {
                             bluetooth_list: t!("notify_icon.bluetooth_list").to_string(),
                             connection_list: t!("notify_icon.connection_list").to_string(),
                             exit: t!("notify_icon.exit").to_string(),
+                            ..Default::default()
                         },
                     )
                     .unwrap();

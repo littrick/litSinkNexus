@@ -1,4 +1,4 @@
-use crate::internal::*;
+use crate::{app::config::AppConfig, internal::*};
 use anyhow::Context;
 use std::{
     collections::HashMap,
@@ -46,6 +46,7 @@ impl Default for DeviceStatusStrings {
 #[derive(Debug)]
 struct ConnectionContext {
     window: WndHandle,
+    config: Arc<AppConfig>,
     picker: DevicePicker,
     connections: Mutex<HashMap<HSTRING, (DeviceInformation, AudioPlaybackConnection)>>,
     strings: DeviceStatusStrings,
@@ -57,10 +58,15 @@ pub struct ConnectionManager {
 }
 
 impl ConnectionManager {
-    pub fn new(window: HWND, strings: DeviceStatusStrings) -> anyhow::Result<Self> {
+    pub fn new(
+        window: HWND,
+        config: Arc<AppConfig>,
+        strings: DeviceStatusStrings,
+    ) -> anyhow::Result<Self> {
         let manager = Self {
             context: Arc::new(ConnectionContext {
                 window: WndHandle::new(window),
+                config,
                 connections: Default::default(),
                 picker: DevicePicker::new().context("Failed to create DevicePicker")?,
                 strings,
@@ -126,6 +132,15 @@ impl ConnectionManager {
                     DevicePickerDisplayStatusOptions::None,
                 )
                 .context("Fail to clear picker display status")?;
+
+            if self.context.config.auto_connect.lock().unwrap().to_owned() {
+                log::info!(
+                    "Auto connecting to device: {}({})",
+                    device.Name()?,
+                    device.Id()?
+                );
+                Self::connect(context.clone(), &device).to_win_result()?;
+            }
         }
 
         picker

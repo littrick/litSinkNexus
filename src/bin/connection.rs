@@ -156,7 +156,7 @@ extern "system" fn wnproc(window: HWND, message: u32, wparam: WPARAM, lparam: LP
                 _ => {}
             }
         }
-        _ => {},
+        _ => {}
     };
 
     unsafe { DefWindowProcW(window, message, wparam, lparam) }

@@ -1,8 +1,8 @@
 use clap::Parser;
+use lit_audio_nexus::{app::Application, init_i18n};
 use std::{fs::File, path::PathBuf};
 use tracing_perfetto::PerfettoLayer;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
-use lit_audio_nexus::{app::Application, init_i18n};
 
 /// Command line arguments
 #[derive(Debug, Parser)]
@@ -23,11 +23,11 @@ fn main() {
         tracing_subscriber::registry()
             .with(perfetto_layer)
             .with(EnvFilter::from_default_env())
-            .with(fmt::layer().compact())
+            .with(fmt::layer().with_filter(EnvFilter::default()))
             .init();
     } else {
         tracing_subscriber::fmt::init();
     }
 
-    Application::run().unwrap();
+    Application::run(Default::default()).unwrap();
 }

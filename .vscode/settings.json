@@ -6,5 +6,6 @@
         "system_error": "cpp",
         "xiosbase": "cpp"
     },
-    "markdown.validate.enabled": false
+    "markdown.validate.enabled": false,
+    "svg.preview.background": "editor"
 }
