@@ -1,5 +1,5 @@
 use clap::Parser;
-use lit_audio_nexus::{
+use lit_sink_nexus::{
     app::{AppConfig, Application},
     init_i18n,
 };

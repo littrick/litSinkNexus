@@ -1,0 +1,20 @@
+<WixLocalization Culture="zh-cn" Codepage="936" xmlns="http://wixtoolset.org/schemas/v4/wxl">
+    <String Id="ApplicationName" Value="Lit 音频播放中心" />
+    <String Id="PackageName" Value="Lit 音频播放中心" />
+    <String Id="PackageManufacturer" Value="Littrick" />
+
+    <String Id="FeatureBinariesTitle" Value="安装Lit音频播放中心" />
+    <String Id="FeatureBinariesDescription" Value="安装Lit音频播放中心的二进制文件" />
+    <String Id="FeatureDestopShortcutsTitle" Value="桌面快捷方式" />
+    <String Id="FeatureDestopShortcutsDescription" Value="在桌面上创建Lit Audio Sink Nexus的快捷方式" />
+
+    <String Id="FeaturePathTitle" Value="Path环境变量" />
+    <String Id="FeaturePathDescription" Value="设置Lit Audio Sink Nexus的Path环境变量" />
+
+    <String Id="FeatureServiceTitle" Value="Lit Audio Sink Nexus服务" />
+    <String Id="FeatureServiceDescription" Value="安装Lit Audio Sink Nexus的服务组件" />
+
+    <String Id="ServiceDisplayName" Value="Lit Audio Sink Nexus服务" />
+    <String Id="ServiceDescription" Value="Lit Audio Sink Nexus 蓝牙音频Sink中心服务" />
+
+</WixLocalization>

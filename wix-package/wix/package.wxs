@@ -1,0 +1,34 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+    <?include var.wxi?>
+    <Package
+        Name="!(loc.PackageName)"
+        Manufacturer="!(loc.PackageManufacturer)"
+        UpgradeCode="$(var.UpgradeCode)"
+        Version="$(var.Version)">
+        <ComponentGroupRef Id="Directories" />
+
+        <Feature Id="Binaries" Title="!(loc.FeatureBinariesTitle)"
+            Description="!(loc.FeatureBinariesDescription)"
+            ConfigurableDirectory="APPINSTLLFOLDER"
+            Display="expand"
+            AllowAbsent="no">
+            <ComponentRef Id="binary" />
+            <ComponentRef Id="License" />
+            <ComponentRef Id="ApplicationShortcut" />
+            <ComponentRef Id="LogsDirectory" />
+            <ComponentRef Id="ConfigFIle" />
+
+            <Feature Id="DestopShortcuts"
+                Title="!(loc.FeatureDestopShortcutsTitle)"
+                Description="!(loc.FeatureDestopShortcutsDescription)">
+                <ComponentRef Id="ApplicationShortcutDesktop" />
+            </Feature>
+
+            <Feature Id="Path" Title="!(loc.FeaturePathTitle)"
+                Description="!(loc.FeaturePathDescription)">
+                <ComponentRef Id="AppendPath" />
+            </Feature>
+        </Feature>
+        <UIRef Id="PackageUI" />
+    </Package>
+</Wix>

@@ -1,0 +1,86 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+    <?include var.wxi?>
+    <Fragment>
+        <StandardDirectory Id="ProgramFiles6432Folder">
+            <Directory Id="APPINSTLLFOLDER" Name="$(var.AppName)">
+                <Component Id="AppendPath" KeyPath="yes"
+                    Guid="{C83951E4-EEBC-E299-7C30-77FEF44ED212}">
+
+                    <Environment Id="PATH" Name="PATH" Value="[APPINSTLLFOLDER]" Permanent="no"
+                        Part="last"
+                        Action="set" System="yes" />
+                </Component>
+
+                <Component Id="binary" Guid="{01F75EA5-9269-455E-C3CE-37E95DC8BD42}">
+                    <File Id="ExeFile" Source="$(var.AppExe)" KeyPath="yes" />
+                </Component>
+
+                <Component Id="License" Guid="{2F8B9996-3870-8A61-E0D7-98864B86514C}">
+                    <File Id="LicenseFile" Source="$(var.LicenseFile)" KeyPath="yes" />
+                </Component>
+
+            </Directory>
+        </StandardDirectory>
+
+        <StandardDirectory Id="ProgramMenuFolder">
+            <!-- 创建目录方便删除 -->
+            <Directory Id="StartMenuDir" Name="$(var.AppName)">
+                <Component Id="ApplicationShortcut" Guid="{220EBAAA-FD72-4AE0-4A68-A56CC18C6CB5}">
+
+                    <Shortcut Id="ApplicationStartMenuShortcut"
+                        Name="!(loc.ApplicationName)"
+                        Description="$(var.AppDes)" Target="[!ExeFile]"
+                        WorkingDirectory="AppDataDir" />
+                    <!-- 注册表 安装目录 -->
+
+                    <RegistryKey Root="HKCU" Key="Software\$(var.AppName)">
+                        <RegistryValue Name="InstallationPath" Type="string"
+                            Value="[APPINSTLLFOLDER]" />
+                        <RegistryValue Name="installed" Type="integer" Value="1" KeyPath="yes" />
+                    </RegistryKey>
+
+                </Component>
+            </Directory>
+        </StandardDirectory>
+
+        <StandardDirectory Id="DesktopFolder">
+            <Component Id="ApplicationShortcutDesktop" Guid="{4EFA3AA0-74D1-989F-6D91-509877A7D10E}">
+                <Shortcut Id="ApplicationDesktopShortcut" Name="!(loc.ApplicationName)"
+                    Description="$(var.AppDes)"
+                    Target="[!ExeFile]"
+                    WorkingDirectory="AppDataDir" />
+
+                <RegistryValue Root="HKCU" Key="Software\$(var.AppName)" Name="DesktopShortcut"
+                    Type="integer"
+                    Value="1" KeyPath="yes" />
+
+            </Component>
+        </StandardDirectory>
+
+        <StandardDirectory Id="AppDataFolder">
+            <Directory Id="AppDataDir" Name="$(var.AppName)">
+                <Directory Name="logs">
+                    <Component Id="LogsDirectory" Guid="{D1A5F8C3-1B8E-4E2D-9C6C-3F4D5E6A7B8C}"
+                        KeyPath="yes">
+                        <CreateFolder />
+                    </Component>
+                </Directory>
+
+                <Component Id="ConfigFIle" Guid="{5f9de16e-cb69-4abc-ad4d-3d07200fdcbc}" KeyPath="yes">
+                    <File Id="ConfigFile" Name="config.toml" Source="config.toml" />
+                </Component>
+            </Directory>
+        </StandardDirectory>
+
+        <ComponentGroup Id="Directories">
+            <ComponentRef Id="AppendPath" />
+            <ComponentRef Id="binary" />
+            <ComponentRef Id="License" />
+            <ComponentRef Id="ApplicationShortcut" />
+            <ComponentRef Id="ApplicationShortcutDesktop" />
+            <ComponentRef Id="LogsDirectory" />
+            <ComponentRef Id="ConfigFIle" />
+        </ComponentGroup>
+
+    </Fragment>
+</Wix>
