@@ -50,6 +50,7 @@ pub struct NotifyIcon {
     menu_str: MenuStrings,
 }
 
+#[allow(unused)]
 impl NotifyIcon {
     const IDM_EXIT: u32 = 1001;
     const IDM_CONNECTION: u32 = 1002;
@@ -133,7 +134,7 @@ impl NotifyIcon {
         }?;
 
         let checked = {
-            if self.config.auto_connect.lock().unwrap().to_owned() {
+            if self.config.auto_connect() {
                 MF_CHECKED
             } else {
                 MF_UNCHECKED
@@ -229,9 +230,9 @@ impl NotifyIcon {
                 self.show_connection_list()?;
             }
             Self::IDM_AUTO_CONNECT => {
-                let mut auto_connect = self.config.auto_connect.lock().unwrap();
-                *auto_connect = !*auto_connect;
-                log::info!("Auto Connect set to {}", *auto_connect);
+                let auto_connect = self.config.auto_connect();
+                self.config.set_auto_connect(!auto_connect);
+                log::info!("Auto Connect set to {}", !auto_connect);
             }
             Self::IDM_EXIT => {
                 unsafe { PostQuitMessage(0) };

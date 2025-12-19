@@ -1,5 +1,8 @@
 use crate::{
-    app::{config::AppConfig, notify_icon::{MenuStrings, NotifyIcon}},
+    app::{
+        config::AppConfig,
+        notify_icon::{MenuStrings, NotifyIcon},
+    },
     internal::*,
 };
 use anyhow::Context;
@@ -23,7 +26,6 @@ pub struct Application {
 impl Application {
     const CLASS_NAME: LazyCell<&'static str> = LazyCell::new(|| std::any::type_name::<Self>());
     const WM_NOTIFYICON: u32 = WM_USER + 1;
-    const WM_NOTIFYICON_SHOW_PICKER: u32 = WM_USER + 2;
     const WM_TASKBAR_CREATED: LazyCell<u32> =
         LazyCell::new(|| unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) });
 
@@ -106,15 +108,6 @@ impl Application {
                     .handle_message(lparam.0 as u32)
                     .unwrap();
             }
-            Self::WM_NOTIFYICON_SHOW_PICKER => {
-                let x = unsafe { GetSystemMetrics(SM_CXSCREEN) };
-                let y = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-                self.notify_icon
-                    .as_ref()
-                    .unwrap()
-                    .show_picker(x, y)
-                    .warn("Fail to show device picker");
-            }
             WM_COMMAND => {
                 self.notify_icon
                     .as_ref()
@@ -165,14 +158,6 @@ impl Application {
                     notify_icon.add().unwrap();
                     (*this).notify_icon = Some(notify_icon);
                     SetWindowLongPtrW(window, GWLP_USERDATA, this as isize);
-
-                    PostMessageW(
-                        Some(window),
-                        Self::WM_NOTIFYICON_SHOW_PICKER,
-                        WPARAM(0),
-                        LPARAM(0),
-                    )
-                    .warn("Fail to post show picker message");
                 }
             } else {
                 let this = GetWindowLongPtrW(window, GWLP_USERDATA) as *mut Self;

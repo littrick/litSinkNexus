@@ -3,6 +3,7 @@ use anyhow::Context;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
+    thread,
 };
 use tracing::log;
 use windows::{
@@ -57,6 +58,7 @@ pub struct ConnectionManager {
     context: Arc<ConnectionContext>,
 }
 
+#[allow(unused)]
 impl ConnectionManager {
     pub fn new(
         window: HWND,
@@ -104,6 +106,25 @@ impl ConnectionManager {
         Ok(())
     }
 
+    pub fn hide(&self) -> anyhow::Result<()> {
+        log::info!("Closing Device Picker");
+
+        self.context.picker.Hide()?;
+        Ok(())
+    }
+
+    fn show_picker(&self) -> anyhow::Result<()> {
+        let x = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+        let y = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+
+        self.show(Rect {
+            X: x as f32,
+            Y: y as f32,
+            Width: 0.0,
+            Height: 0.0,
+        })
+    }
+
     fn init_picker(&self) -> anyhow::Result<()> {
         let context = &self.context;
         let picker = &self.context.picker;
@@ -122,25 +143,16 @@ impl ConnectionManager {
             .into_iter()
             .collect::<Vec<_>>();
 
-        for device in all_device {
+        for device in &all_device {
             log::debug!("Clearing device: {}({})", device.Name()?, device.Id()?);
 
             picker
                 .SetDisplayStatus(
-                    &device,
+                    &device.clone(),
                     &HSTRING::from(""),
                     DevicePickerDisplayStatusOptions::None,
                 )
                 .context("Fail to clear picker display status")?;
-
-            if self.context.config.auto_connect.lock().unwrap().to_owned() {
-                log::info!(
-                    "Auto connecting to device: {}({})",
-                    device.Name()?,
-                    device.Id()?
-                );
-                Self::connect(context.clone(), &device).to_win_result()?;
-            }
         }
 
         picker
@@ -218,6 +230,26 @@ impl ConnectionManager {
         picker
             .Appearance()?
             .SetTitle(&HSTRING::from(&context.strings.picker_title))?;
+
+        if self.context.config.auto_connect() {
+            self.show_picker()?;
+            for device in &all_device {
+                thread::spawn({
+                    let context = context.clone();
+                    let device = device.clone();
+                    move || {
+                        log::info!(
+                            "Auto connecting to: {}({})",
+                            device.Name().unwrap_or(HSTRING::from("(Unknown)")),
+                            device.Id().unwrap()
+                        );
+                        if let Err(e) = ConnectionManager::connect(context.clone(), &device) {
+                            log::error!("Auto connect failed: {:?}", e);
+                        }
+                    }
+                });
+            }
+        }
 
         Ok(())
     }

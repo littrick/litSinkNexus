@@ -4,3 +4,4 @@ mod connection_manager;
 mod notify_icon;
 
 pub use app::*;
+pub use config::*;
