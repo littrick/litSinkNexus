@@ -1,0 +1,13 @@
+[package]
+name = "wix-package"
+publish = false
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+keywords.workspace = true
+
+[dependencies]
+uuid = { version = "1.19.0", features = ["v5"] }

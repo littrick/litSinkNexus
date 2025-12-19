@@ -19,6 +19,7 @@ fn main() {
     check_i18n();
     let ico = generate_ico(&out_dir);
     embed_icon(ico.to_str().unwrap());
+    strip_commandline();
 
     println!("cargo:rerun-if-changed={}", ico.to_string_lossy());
 }
@@ -84,4 +85,12 @@ fn embed_icon(icon_path: &str) {
         .compile()
         .expect("Failed to embed icon");
     println!("cargo:rerun-if-changed=logo.ico");
+}
+
+
+fn strip_commandline() {
+    if std::env::var("CARGO_CFG_WINDOWS").is_ok() && std::env::var("PROFILE").unwrap() == "release" {
+        println!("cargo:rustc-link-arg=/SUBSYSTEM:WINDOWS");
+        println!("cargo:rustc-link-arg=/ENTRY:mainCRTStartup");
+    }
 }
