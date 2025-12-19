@@ -1,14 +1,21 @@
-use windows::{Devices::Enumeration::*, Foundation::*, core::*};
+use windows::{Devices::Enumeration::*, Foundation::*, Media::Audio::*, core::*};
 
 fn main() -> Result<()> {
-    let watcher = DeviceInformation::CreateWatcher()?;
+    let filter = AudioPlaybackConnection::GetDeviceSelector().unwrap();
 
-    watcher.Added(&TypedEventHandler::<DeviceWatcher, DeviceInformation>::new(
+    let watcher = DeviceInformation::CreateWatcherAqsFilter(&filter).unwrap();
+
+    watcher.Added(&TypedEventHandler::<_, DeviceInformation>::new(
         |_, info| {
             println!("{:?}", info.as_ref().expect("info").Name()?);
             Ok(())
         },
     ))?;
+
+    watcher.Updated(&TypedEventHandler::<_, DeviceInformationUpdate>::new(|_, args| {
+        println!("updated: {:?}", args.as_ref().unwrap().Id().unwrap());
+        Ok(())
+    }))?;
 
     watcher.EnumerationCompleted(&TypedEventHandler::new(|_, _| {
         println!("done!");
@@ -16,21 +23,9 @@ fn main() -> Result<()> {
     }))?;
 
     watcher.Start()?;
-    std::thread::sleep(std::time::Duration::new(10, 0));
-
-    let picker = DevicePicker::new()?;
-    picker.DeviceSelected(
-        &TypedEventHandler::<DevicePicker, DeviceSelectedEventArgs>::new(|_, args| {
-            let device_name = args
-                .as_ref()
-                .unwrap()
-                .SelectedDevice()
-                .unwrap()
-                .Name()
-                .unwrap();
-            println!("Selected device: {}", device_name);
-            Ok(())
-        }),
-    )?;
-    Ok(())
+    loop {
+        std::thread::sleep(std::time::Duration::new(1, 0));
+    }
+    // std::thread::sleep(std::time::Duration::new(10, 0));
+    // Ok(())
 }

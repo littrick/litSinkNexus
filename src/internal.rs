@@ -90,18 +90,7 @@ impl WarnExt for HRESULT {
     }
 }
 
-impl<T> WarnExt for Result<T> {
-    fn warn<C>(self, msg: C)
-    where
-        C: Display + Send + Sync + 'static,
-    {
-        if let Err(e) = self {
-            tracing::log::warn!("{}: {:?}", msg, e);
-        }
-    }
-}
-
-impl<T> WarnExt for anyhow::Result<T> {
+impl<T, E> WarnExt for std::result::Result<T, E> where E: std::fmt::Debug {
     fn warn<C>(self, msg: C)
     where
         C: Display + Send + Sync + 'static,
