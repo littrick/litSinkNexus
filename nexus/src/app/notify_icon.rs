@@ -35,7 +35,7 @@ impl Default for MenuStrings {
         Self {
             connection_list: "Open Connection List(&C)".to_string(),
             bluetooth_list: "Add Bluetooth Device(&B)".to_string(),
-            auto_connect: "Auto Connect(&A)".to_string(),
+            auto_connect: "Automatically connect at startup(&A)".to_string(),
             exit: "Exit(&X)".to_string(),
         }
     }

@@ -60,8 +60,14 @@ en-US = "Add Bluetooth Device(&B)"
 zh-CN = "添加蓝牙设备(&B)"
 zh-TW = "添加藍牙裝置(&B)"
 
+[notify_icon.auto_connect]
+en = "Automatically connect at startup(&A)"
+en-US = "Automatically connect at startup(&A)"
+zh-CN = "启动时自动连接(&A)"
+zh-TW = "啟動時自動連線(&A)"
+
 [notify_icon.exit]
-en = "Exit(&E)"
-en-US = "Exit(&E)"
-zh-CN = "退出(&E)"
-zh-TW = "退出(&E)"
+en = "Exit(&X)"
+en-US = "Exit(&X)"
+zh-CN = "退出(&X)"
+zh-TW = "退出(&X)"

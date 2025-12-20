@@ -1,15 +1,17 @@
 use crate::internal::WarnExt;
 use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    path::PathBuf,
-    sync::RwLock,
-};
+use std::{fs, path::PathBuf, sync::RwLock};
 use tracing::log;
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Config {
     auto_connect: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self { auto_connect: true }
+    }
 }
 
 #[derive(Debug)]
