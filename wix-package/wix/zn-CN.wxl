@@ -17,4 +17,6 @@
     <String Id="ServiceDisplayName" Value="Lit Audio Sink Nexus服务" />
     <String Id="ServiceDescription" Value="Lit Audio Sink Nexus 蓝牙音频Sink中心服务" />
 
+    <String Id="LaunchAppDescription" Value="启动 Lit 音频播放中心" />
+
 </WixLocalization>

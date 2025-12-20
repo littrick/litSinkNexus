@@ -74,5 +74,5 @@ fn generate_variable_wxi() {
         .unwrap();
 
     let dummy_config = wix_dir.join("config.toml");
-    fs::write(&dummy_config, "# Dummy config file").expect("Unable to write dummy config.toml");
+    fs::write(&dummy_config, "").expect("Unable to write dummy config.toml");
 }

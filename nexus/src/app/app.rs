@@ -188,6 +188,7 @@ impl Application {
                         MenuStrings {
                             bluetooth_list: t!("notify_icon.bluetooth_list").to_string(),
                             connection_list: t!("notify_icon.connection_list").to_string(),
+                            auto_connect: t!("notify_icon.auto_connect").to_string(),
                             exit: t!("notify_icon.exit").to_string(),
                             ..Default::default()
                         },
