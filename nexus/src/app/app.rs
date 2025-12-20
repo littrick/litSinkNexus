@@ -25,7 +25,9 @@ pub struct Application {
 
 impl Application {
     const CLASS_NAME: LazyCell<&'static str> = LazyCell::new(|| std::any::type_name::<Self>());
+    const WINDOW_NAME: LazyCell<&'static str> = LazyCell::new(|| "LitAudioSinkNexusHiddenWindow");
     const WM_NOTIFYICON: u32 = WM_USER + 1;
+    const WM_SHOW_PICKER: u32 = WM_USER + 2;
     const WM_TASKBAR_CREATED: LazyCell<u32> =
         LazyCell::new(|| unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) });
 
@@ -37,6 +39,22 @@ impl Application {
             notify_icon: None,
         };
 
+        match app.find_exists() {
+            Ok(wnd) => {
+                log::info!("Found existing application window, activating...");
+                unsafe { PostMessageW(Some(wnd), Self::WM_SHOW_PICKER, WPARAM(0), LPARAM(0)) }?;
+            }
+            Err(_) => {
+                app.main_loop()?;
+            }
+        }
+
+        Ok(app)
+    }
+}
+
+impl Application {
+    fn main_loop(&self) -> anyhow::Result<()> {
         let module = unsafe { GetModuleHandleW(None) }
             .context("Fail to get HMODULE handle for the current application")?;
 
@@ -45,12 +63,12 @@ impl Application {
         let cursor =
             unsafe { LoadCursorW(None, IDC_ARROW) }.context("Failed to load arrow cursor")?;
 
-        let class_name = HSTRING::from(*Self::CLASS_NAME);
+        let wnd_class = HSTRING::from(*Self::CLASS_NAME);
         let window_class = WNDCLASSEXW {
             cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
             hCursor: cursor,
             hInstance: instance,
-            lpszClassName: PCWSTR::from_raw(class_name.as_ptr()),
+            lpszClassName: PCWSTR::from_raw(wnd_class.as_ptr()),
             style: CS_HREDRAW | CS_VREDRAW,
             lpfnWndProc: Some(Self::wndproc),
             ..Default::default()
@@ -62,12 +80,13 @@ impl Application {
             return win_error("Failed to register window class");
         }
 
+        let wnd_name = HSTRING::from(*Self::WINDOW_NAME);
         let window = unsafe {
-            let class_name = HSTRING::from(*Self::CLASS_NAME);
+            let wnd_class = HSTRING::from(*Self::CLASS_NAME);
             CreateWindowExW(
                 WS_EX_LAYERED,
-                PCWSTR::from_raw(class_name.as_ptr()),
-                w!(""),
+                PCWSTR::from_raw(wnd_class.as_ptr()),
+                PCWSTR::from_raw(wnd_name.as_ptr()),
                 WS_POPUP,
                 0,
                 0,
@@ -76,7 +95,7 @@ impl Application {
                 None,
                 None,
                 Some(instance),
-                Some(&app as *const _ as *const _),
+                Some(self as *const _ as *const _),
             )
         }
         // .context("Failed to create application window")?;
@@ -90,8 +109,19 @@ impl Application {
             let _ = unsafe { TranslateMessage(&msg) };
             unsafe { DispatchMessageW(&msg) };
         }
+        Ok(())
+    }
 
-        Ok(app)
+    fn find_exists(&self) -> anyhow::Result<HWND> {
+        let wnd_class = HSTRING::from(*Self::CLASS_NAME);
+        let wnd_name = HSTRING::from(*Self::WINDOW_NAME);
+        let wnd = unsafe {
+            FindWindowW(
+                PCWSTR::from_raw(wnd_class.as_ptr()),
+                PCWSTR::from_raw(wnd_name.as_ptr()),
+            )
+        }?;
+        Ok(wnd)
     }
 
     // #[tracing::instrument]
@@ -107,6 +137,15 @@ impl Application {
                     .unwrap()
                     .handle_message(lparam.0 as u32)
                     .unwrap();
+            }
+            Self::WM_SHOW_PICKER => {
+                let x = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+                let y = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+                self.notify_icon
+                    .as_ref()
+                    .unwrap()
+                    .show_picker(x, y)
+                    .warn("Fail to Show Picker");
             }
             WM_COMMAND => {
                 self.notify_icon

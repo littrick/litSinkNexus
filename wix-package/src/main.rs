@@ -42,8 +42,8 @@ fn generate_variable_wxi() {
     }
 
     let wxi_content = format!(
-        r#"<Include xmlns="http://wixtoolset.org/schemas/v4/wxs">{}</Include>"#,
-        wxi_content
+        r#"<Include xmlns="http://wixtoolset.org/schemas/v4/wxs">{}{}</Include>"#,
+        "\n", wxi_content
     );
 
     fs::write(&wxi_path, wxi_content).expect("Unable to write var.wxi file");
