@@ -1,0 +1,83 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Type of version bump: major, minor, patch'
+        default: patch
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+      version:
+        description: 'Set specific version (overrides bump_type, optional)'
+        default: ''
+        type: string
+
+jobs:
+  bump_version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Cargo Edit and toml-cli
+        run: |
+          cargo install cargo-edit
+          cargo install toml-cli
+
+      - name: Bump Version
+        run: |
+          if [ "${{ inputs.version }}" != "" ]; then
+            cargo set-version ${{ inputs.version }}
+          else
+            cargo set-version --bump ${{ inputs.bump_type }}
+          fi
+
+      - name: Push Changes
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "Bump version to ${{ inputs.version || 'new version' }}"
+          branch: ${{ github.ref_name }}
+          file_pattern: Cargo.toml
+
+  release:
+    needs: bump_version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Setup tools
+        run: |
+          dotnet tool install --global wix
+          cargo install toml-cli
+
+      - name: Get Package Version
+        run: |
+          $version = $(toml get Cargo.toml workspace.package.version)
+          $version = $version.Trim('"')
+          echo "Package Version: $version"
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Build Release
+        run: |
+          cargo r --package wix-package
+          echo "EXE_NAME=LitAudioSinkNexus-${{ env.VERSION }}-windows-amd64.exe" >> $env:GITHUB_ENV
+          echo "MSI_NAME=LitAudioSinkNexus-Setup-${{ env.VERSION }}-windows-amd64.msi" >> $env:GITHUB_ENV
+
+      - name: Prepare Release Artifacts
+        run: |
+          Copy-Item target\release\nexus.exe ${{ env.EXE_NAME }}
+          Copy-Item target\LitAudioSinkNexus-Setup-${{ env.VERSION }}.msi ${{ env.MSI_NAME }}
+
+      - name: Upload Release Artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: Release ${{ env.VERSION }}
+          files: |
+            ${{ env.EXE_NAME }}
+            ${{ env.MSI_NAME }}
