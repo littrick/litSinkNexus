@@ -29,6 +29,7 @@
                 <ComponentRef Id="AppendPath" />
             </Feature>
         </Feature>
+        <Media Id="1" Cabinet="app.cab" EmbedCab="yes" />
         <UIRef Id="PackageUI" />
     </Package>
 </Wix>
