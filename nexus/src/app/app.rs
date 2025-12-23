@@ -157,7 +157,11 @@ impl Application {
             msg if msg == *Self::WM_TASKBAR_CREATED => {
                 // when explorer.exe restarts, the taskbar is recreated, need to re-add the notify icon
                 log::debug!("Taskbar recreated, re-adding notify icon");
-                self.notify_icon.as_ref().unwrap().add().unwrap();
+                self.notify_icon
+                    .as_ref()
+                    .unwrap()
+                    .add()
+                    .warn("Failed to re-add notify icon");
             }
             _ => {
                 return unsafe { DefWindowProcW(self.window, message, wparam, lparam) };
