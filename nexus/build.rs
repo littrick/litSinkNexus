@@ -87,9 +87,9 @@ fn embed_icon(icon_path: &str) {
     println!("cargo:rerun-if-changed=logo.ico");
 }
 
-
 fn strip_commandline() {
-    if std::env::var("CARGO_CFG_WINDOWS").is_ok() && std::env::var("PROFILE").unwrap() == "release" {
+    if std::env::var("CARGO_CFG_WINDOWS").is_ok() && std::env::var("PROFILE").unwrap() == "release"
+    {
         println!("cargo:rustc-link-arg=/SUBSYSTEM:WINDOWS");
         println!("cargo:rustc-link-arg=/ENTRY:mainCRTStartup");
     }
