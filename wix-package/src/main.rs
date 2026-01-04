@@ -23,7 +23,7 @@ fn generate_variable_wxi() {
 
     let version = env!("CARGO_PKG_VERSION");
     let upgrade_code =
-        uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_X500, version.as_bytes()).to_string();
+        uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_X500, app_name.as_bytes()).to_string();
 
     let directives = vec![
         ("AppName", app_name),
