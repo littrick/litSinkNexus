@@ -263,17 +263,17 @@ impl ConnectionManager {
         )?;
 
         let device_id = device.Id().unwrap();
-
         let connection = AudioPlaybackConnection::TryCreateFromId(&device_id).context(format!(
             "Failed to create AudioPlaybackConnection for device ID: {device_id}",
         ))?;
 
         connection.StateChanged(&{
             let context = context.clone();
+            let device_id = device_id.clone();
             TypedEventHandler::<AudioPlaybackConnection, _>::new(move |sender, _| {
                 let connection = sender.as_ref().unwrap();
                 let state = sender.as_ref().unwrap().State().unwrap();
-                Self::handle_state(context.clone(), connection, state);
+                Self::handle_state(&device_id, context.clone(), connection, state);
                 Ok(())
             })
         })?;
@@ -337,16 +337,15 @@ impl ConnectionManager {
     }
 
     fn handle_state(
+        device_id: &HSTRING,
         context: Arc<ConnectionContext>,
         connection: &AudioPlaybackConnection,
         state: AudioPlaybackConnectionState,
     ) {
         match state {
-            AudioPlaybackConnectionState::Opened => {
-                log::debug!("Device opened: {}", connection.DeviceId().unwrap());
-            }
             AudioPlaybackConnectionState::Closed => {
-                let device_id = connection.DeviceId().unwrap();
+                // let device_id = connection.DeviceId().unwrap(); // Bug: Windows 问题会导致 double free
+
                 log::debug!("AudioPlaybackConnection closed: {}", device_id);
                 let connection = context.connections.lock().unwrap().remove(&device_id);
 
